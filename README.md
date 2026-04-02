@@ -1,6 +1,6 @@
 # Developer Landing
 
-![Vista previa del proyecto](./preview.png)
+![Vista previa del proyecto](./preview.PNG)
 
 Landing page interactiva desarrollada con **HTML**, **CSS** y **JavaScript**, con una estética moderna y efectos visuales construidos sobre **Canvas API**, que es el elemento principal y más destacado del proyecto.
 
