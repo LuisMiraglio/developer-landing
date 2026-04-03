@@ -192,16 +192,16 @@ canvas {
     font-size: clamp(2.5rem, 12vw, 4.2rem);
   }
 
-  .hero-role {
-    margin-top: 10px;
-    font-size: clamp(1.1rem, 5.2vw, 1.5rem);
-    line-height: 1.15;
-  }
+.hero-role {
+  margin-top: 28px;
+  font-size: clamp(1.1rem, 5.2vw, 1.5rem);
+  line-height: 1.15;
+}
 
-  .socials {
-    gap: 12px;
-    margin-top: 24px;
-  }
+.socials {
+  gap: 12px;
+  margin-top: 30px;
+}
 
   .social-link {
     width: 50px;
