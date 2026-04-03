@@ -65,12 +65,13 @@ function getTitleBounds() {
   const rect = titleEl.getBoundingClientRect();
   const padX = isMobile() ? 12 : 26;
   const padY = isMobile() ? 10 : 14;
+  const extraHeight = isMobile() ? 46 : 0;
 
   return {
     x: Math.max(0, Math.floor(rect.left - padX)),
     y: Math.max(0, Math.floor(rect.top - padY)),
     width: Math.min(width, Math.ceil(rect.width + padX * 2)),
-    height: Math.min(height, Math.ceil(rect.height + padY * 2))
+    height: Math.min(height, Math.ceil(rect.height + padY * 2 + extraHeight))
   };
 }
 
@@ -88,15 +89,16 @@ function createNameMap(bounds) {
   offCtx.textBaseline = "middle";
 
   const fontSize = mobile
-    ? Math.min(bounds.width * 0.16, bounds.height * 0.46)
+    ? Math.max(30, Math.min(bounds.width * 0.2, 54))
     : Math.min(bounds.width * 0.15, bounds.height * 0.68);
 
   offCtx.font = `800 ${fontSize}px Inter, Arial, sans-serif`;
 
   if (mobile && bounds.width < 520) {
-    const lineGap = fontSize * 0.82;
-    offCtx.fillText("Luis", off.width / 2, off.height / 2 - lineGap / 2);
-    offCtx.fillText("Miraglio", off.width / 2, off.height / 2 + lineGap / 2);
+    const lineGap = fontSize * 0.96;
+    const centerY = off.height / 2 - 3;
+    offCtx.fillText("Luis", off.width / 2, centerY - lineGap / 2);
+    offCtx.fillText("Miraglio", off.width / 2, centerY + lineGap / 2);
   } else {
     offCtx.fillText(SETTINGS.text, off.width / 2, off.height / 2);
   }
@@ -111,7 +113,7 @@ function buildTextParticles() {
   const mapWidth = imageData.width;
   const mapHeight = imageData.height;
 
-  const gap = isMobile() ? SETTINGS.gapMobile : SETTINGS.gapDesktop;
+  const gap = isMobile() ? 5 : SETTINGS.gapDesktop;
   const maxParticles = isMobile() ? SETTINGS.maxParticlesMobile : SETTINGS.maxParticlesDesktop;
 
   const candidates = [];
@@ -145,8 +147,8 @@ function buildTextParticles() {
       baseY,
       vx: 0,
       vy: 0,
-      size: isMobile() ? Math.random() * 0.45 + 1.1 : Math.random() * 0.6 + 1.05,
-      alpha: Math.random() * 0.35 + 0.62
+      size: isMobile() ? Math.random() * 0.55 + 1.35 : Math.random() * 0.6 + 1.05,
+      alpha: Math.random() * 0.28 + 0.72
     });
   }
 }
