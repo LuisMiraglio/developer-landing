@@ -6,7 +6,6 @@
   --text-soft: rgba(245, 247, 255, 0.82);
   --text-muted: rgba(245, 247, 255, 0.52);
   --line: rgba(255, 255, 255, 0.1);
-  --card: rgba(255, 255, 255, 0.05);
   --primary: #70e1ff;
   --secondary: #8b5cf6;
   --accent: #c4b5fd;
@@ -178,22 +177,61 @@ canvas {
 
   .hero {
     min-height: 100svh;
-    padding: 72px 0;
+    width: min(100%, calc(100% - 32px));
+    padding: 36px 0 44px;
+    align-content: center;
   }
 
   .eyebrow {
-    font-size: 0.74rem;
-    letter-spacing: 0.24em;
+    margin: 0 0 14px;
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+  }
+
+  .hero-title {
+    font-size: clamp(2.5rem, 12vw, 4.2rem);
+  }
+
+  .hero-role {
+    margin-top: 10px;
+    font-size: clamp(1.1rem, 5.2vw, 1.5rem);
+    line-height: 1.15;
+  }
+
+  .socials {
+    gap: 12px;
+    margin-top: 24px;
   }
 
   .social-link {
-    width: 52px;
-    height: 52px;
+    width: 50px;
+    height: 50px;
     border-radius: 14px;
   }
 
   .social-link svg {
-    width: 22px;
-    height: 22px;
+    width: 21px;
+    height: 21px;
+  }
+
+  .bg-glow-1 {
+    width: 240px;
+    height: 240px;
+    left: -4%;
+    top: 12%;
+    opacity: 0.18;
+  }
+
+  .bg-glow-2 {
+    width: 220px;
+    height: 220px;
+    right: -6%;
+    bottom: 10%;
+    opacity: 0.16;
+  }
+
+  .bg-grid {
+    opacity: 0.05;
+    background-size: 34px 34px;
   }
 }

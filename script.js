@@ -22,9 +22,9 @@ const mouse = {
 
 const SETTINGS = {
   text: "Luis Miraglio",
-  gap: window.innerWidth < 768 ? 6 : 5,
-  ambientCount: 70,
-  connectionDistance: 62,
+  gap: window.innerWidth < 768 ? 4 : 5,
+  ambientCount: window.innerWidth < 768 ? 48 : 70,
+  connectionDistance: window.innerWidth < 768 ? 52 : 62,
   spring: 0.26,
   friction: 0.76,
   mouseForce: 1.45,
@@ -50,7 +50,10 @@ function resizeCanvas() {
   mouse.lastX = mouse.x;
   mouse.lastY = mouse.y;
 
-  SETTINGS.gap = width < 768 ? 6 : 5;
+  SETTINGS.gap = width < 768 ? 4 : 5;
+  SETTINGS.ambientCount = width < 768 ? 48 : 70;
+  SETTINGS.connectionDistance = width < 768 ? 52 : 62;
+  mouse.radius = width < 768 ? 82 : 105;
 
   buildScene();
 }
@@ -62,16 +65,19 @@ function createTextMap() {
   off.width = width;
   off.height = height;
 
-  const fontSize = Math.min(width * 0.11, 126);
-  const fontWeight = 800;
-  const fontFamily = "Inter, Arial, sans-serif";
+  const isMobile = width < 768;
+  const fontSize = isMobile
+    ? Math.min(width * 0.14, 62)
+    : Math.min(width * 0.11, 126);
+
+  const textY = isMobile ? height / 2 - 10 : height / 2 - 26;
 
   offCtx.clearRect(0, 0, width, height);
   offCtx.fillStyle = "#ffffff";
   offCtx.textAlign = "center";
   offCtx.textBaseline = "middle";
-  offCtx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
-  offCtx.fillText(SETTINGS.text, width / 2, height / 2 - 26);
+  offCtx.font = `800 ${fontSize}px Inter, Arial, sans-serif`;
+  offCtx.fillText(SETTINGS.text, width / 2, textY);
 
   return offCtx.getImageData(0, 0, width, height);
 }
@@ -89,8 +95,8 @@ function buildTextParticles() {
 
       if (alpha > 150) {
         textParticles.push({
-          x: x + (Math.random() - 0.5) * 8,
-          y: y + (Math.random() - 0.5) * 8,
+          x: x + (Math.random() - 0.5) * (width < 768 ? 4 : 8),
+          y: y + (Math.random() - 0.5) * (width < 768 ? 4 : 8),
           baseX: x,
           baseY: y,
           vx: 0,
@@ -235,7 +241,7 @@ function drawConnections() {
 }
 
 function drawMouseGlow() {
-  const radius = mouse.radius * 1.05;
+  const radius = width < 768 ? mouse.radius * 0.9 : mouse.radius * 1.05;
   const gradient = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, radius);
   gradient.addColorStop(0, "rgba(112, 225, 255, 0.18)");
   gradient.addColorStop(0.45, "rgba(139, 92, 246, 0.08)");
@@ -251,9 +257,9 @@ function updateClickWaves() {
   clickWaves = clickWaves.filter((wave) => wave.life > 0);
 
   for (const wave of clickWaves) {
-    wave.radius += 38;
+    wave.radius += width < 768 ? 28 : 38;
     wave.life -= 1;
-    wave.power *= 0.84;
+    wave.power *= width < 768 ? 0.86 : 0.84;
   }
 }
 
