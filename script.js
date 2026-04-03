@@ -1,13 +1,14 @@
 const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+const ctx = canvas.getContext("2d", { alpha: true });
+const titleEl = document.getElementById("heroTitle");
 
 let width = window.innerWidth;
 let height = window.innerHeight;
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 
 let textParticles = [];
-let ambientParticles = [];
-let clickWaves = [];
+let clickRipples = [];
+let nameBounds = null;
 
 const mouse = {
   x: width * 0.5,
@@ -16,30 +17,36 @@ const mouse = {
   lastY: height * 0.5,
   vx: 0,
   vy: 0,
-  radius: 105,
-  moved: false
+  radius: 96
 };
 
 const SETTINGS = {
   text: "Luis Miraglio",
-  gap: window.innerWidth < 768 ? 4 : 5,
-  ambientCount: window.innerWidth < 768 ? 48 : 70,
-  connectionDistance: window.innerWidth < 768 ? 52 : 62,
-  spring: 0.26,
-  friction: 0.76,
-  mouseForce: 1.45,
-  moveBoost: 0.62,
-  clickForce: 18,
-  clickRadius: 260
+  spring: 0.145,
+  friction: 0.82,
+  basePush: 1.05,
+  moveBoost: 0.28,
+  clickForceDesktop: 9.5,
+  clickForceMobile: 6.5,
+  rippleGrowthDesktop: 18,
+  rippleGrowthMobile: 14,
+  gapDesktop: 5,
+  gapMobile: 7,
+  maxParticlesDesktop: 3800,
+  maxParticlesMobile: 2400
 };
+
+function isMobile() {
+  return width <= 768;
+}
 
 function resizeCanvas() {
   width = window.innerWidth;
   height = window.innerHeight;
   dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  canvas.width = width * dpr;
-  canvas.height = height * dpr;
+  canvas.width = Math.floor(width * dpr);
+  canvas.height = Math.floor(height * dpr);
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
 
@@ -49,118 +56,131 @@ function resizeCanvas() {
   mouse.y = height * 0.5;
   mouse.lastX = mouse.x;
   mouse.lastY = mouse.y;
+  mouse.radius = isMobile() ? 78 : 96;
 
-  SETTINGS.gap = width < 768 ? 4 : 5;
-  SETTINGS.ambientCount = width < 768 ? 48 : 70;
-  SETTINGS.connectionDistance = width < 768 ? 52 : 62;
-  mouse.radius = width < 768 ? 82 : 105;
-
-  buildScene();
+  buildTextParticles();
 }
 
-function createTextMap() {
+function getTitleBounds() {
+  const rect = titleEl.getBoundingClientRect();
+  const padX = isMobile() ? 12 : 26;
+  const padY = isMobile() ? 10 : 14;
+
+  return {
+    x: Math.max(0, Math.floor(rect.left - padX)),
+    y: Math.max(0, Math.floor(rect.top - padY)),
+    width: Math.min(width, Math.ceil(rect.width + padX * 2)),
+    height: Math.min(height, Math.ceil(rect.height + padY * 2))
+  };
+}
+
+function createNameMap(bounds) {
   const off = document.createElement("canvas");
   const offCtx = off.getContext("2d");
 
-  off.width = width;
-  off.height = height;
+  off.width = Math.max(1, bounds.width);
+  off.height = Math.max(1, bounds.height);
 
-  const isMobile = width < 768;
-  const fontSize = isMobile
-    ? Math.min(width * 0.14, 62)
-    : Math.min(width * 0.11, 126);
-
-  const textY = isMobile ? height / 2 - 10 : height / 2 - 26;
-
-  offCtx.clearRect(0, 0, width, height);
+  const mobile = isMobile();
+  offCtx.clearRect(0, 0, off.width, off.height);
   offCtx.fillStyle = "#ffffff";
   offCtx.textAlign = "center";
   offCtx.textBaseline = "middle";
-  offCtx.font = `800 ${fontSize}px Inter, Arial, sans-serif`;
-  offCtx.fillText(SETTINGS.text, width / 2, textY);
 
-  return offCtx.getImageData(0, 0, width, height);
+  const fontSize = mobile
+    ? Math.min(bounds.width * 0.16, bounds.height * 0.46)
+    : Math.min(bounds.width * 0.15, bounds.height * 0.68);
+
+  offCtx.font = `800 ${fontSize}px Inter, Arial, sans-serif`;
+
+  if (mobile && bounds.width < 520) {
+    const lineGap = fontSize * 0.82;
+    offCtx.fillText("Luis", off.width / 2, off.height / 2 - lineGap / 2);
+    offCtx.fillText("Miraglio", off.width / 2, off.height / 2 + lineGap / 2);
+  } else {
+    offCtx.fillText(SETTINGS.text, off.width / 2, off.height / 2);
+  }
+
+  return offCtx.getImageData(0, 0, off.width, off.height);
 }
 
 function buildTextParticles() {
-  textParticles = [];
-  const imageData = createTextMap();
+  nameBounds = getTitleBounds();
+  const imageData = createNameMap(nameBounds);
   const data = imageData.data;
-  const gap = SETTINGS.gap;
+  const mapWidth = imageData.width;
+  const mapHeight = imageData.height;
 
-  for (let y = 0; y < height; y += gap) {
-    for (let x = 0; x < width; x += gap) {
-      const index = (y * width + x) * 4;
-      const alpha = data[index + 3];
+  const gap = isMobile() ? SETTINGS.gapMobile : SETTINGS.gapDesktop;
+  const maxParticles = isMobile() ? SETTINGS.maxParticlesMobile : SETTINGS.maxParticlesDesktop;
 
-      if (alpha > 150) {
-        textParticles.push({
-          x: x + (Math.random() - 0.5) * (width < 768 ? 4 : 8),
-          y: y + (Math.random() - 0.5) * (width < 768 ? 4 : 8),
-          baseX: x,
-          baseY: y,
-          vx: 0,
-          vy: 0,
-          size: Math.random() * 1.1 + 1.05,
-          alpha: Math.random() * 0.35 + 0.65
-        });
+  const candidates = [];
+
+  for (let y = 0; y < mapHeight; y += gap) {
+    for (let x = 0; x < mapWidth; x += gap) {
+      const alpha = data[(y * mapWidth + x) * 4 + 3];
+
+      if (alpha > 120) {
+        candidates.push({ x, y });
       }
     }
   }
-}
 
-function buildAmbientParticles() {
-  ambientParticles = [];
+  let stride = 1;
+  if (candidates.length > maxParticles) {
+    stride = Math.ceil(candidates.length / maxParticles);
+  }
 
-  for (let i = 0; i < SETTINGS.ambientCount; i++) {
-    ambientParticles.push({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      vx: (Math.random() - 0.5) * 0.14,
-      vy: (Math.random() - 0.5) * 0.14,
-      size: Math.random() * 1.5 + 0.6,
-      alpha: Math.random() * 0.18 + 0.05
+  textParticles = [];
+
+  for (let i = 0; i < candidates.length; i += stride) {
+    const point = candidates[i];
+    const baseX = nameBounds.x + point.x;
+    const baseY = nameBounds.y + point.y;
+
+    textParticles.push({
+      x: baseX + (Math.random() - 0.5) * (isMobile() ? 1.8 : 2.4),
+      y: baseY + (Math.random() - 0.5) * (isMobile() ? 1.8 : 2.4),
+      baseX,
+      baseY,
+      vx: 0,
+      vy: 0,
+      size: isMobile() ? Math.random() * 0.45 + 1.1 : Math.random() * 0.6 + 1.05,
+      alpha: Math.random() * 0.35 + 0.62
     });
   }
 }
 
-function buildScene() {
-  buildTextParticles();
-  buildAmbientParticles();
-  clickWaves = [];
-}
-
-function updateTextParticles() {
-  const mouseSpeed = Math.hypot(mouse.vx, mouse.vy);
-  const dynamicRadius = mouse.radius + Math.min(mouseSpeed * 18, 60);
+function updateParticles() {
+  const speed = Math.hypot(mouse.vx, mouse.vy);
+  const dynamicRadius = mouse.radius + Math.min(speed * 10, isMobile() ? 20 : 35);
 
   for (const p of textParticles) {
     const dx = p.x - mouse.x;
     const dy = p.y - mouse.y;
-    const distance = Math.hypot(dx, dy) || 0.001;
+    const dist = Math.hypot(dx, dy) || 0.001;
 
-    if (distance < dynamicRadius) {
-      const force = (1 - distance / dynamicRadius) * SETTINGS.mouseForce;
+    if (dist < dynamicRadius) {
+      const power = (1 - dist / dynamicRadius) * SETTINGS.basePush;
       const angle = Math.atan2(dy, dx);
 
-      p.vx += Math.cos(angle) * force * 8.5;
-      p.vy += Math.sin(angle) * force * 8.5;
+      p.vx += Math.cos(angle) * power * 4.4;
+      p.vy += Math.sin(angle) * power * 4.4;
 
-      p.vx += mouse.vx * SETTINGS.moveBoost * force;
-      p.vy += mouse.vy * SETTINGS.moveBoost * force;
+      p.vx += mouse.vx * SETTINGS.moveBoost * power;
+      p.vy += mouse.vy * SETTINGS.moveBoost * power;
     }
 
-    for (const wave of clickWaves) {
-      const cdx = p.x - wave.x;
-      const cdy = p.y - wave.y;
-      const cDist = Math.hypot(cdx, cdy) || 0.001;
+    for (const ripple of clickRipples) {
+      const rx = p.x - ripple.x;
+      const ry = p.y - ripple.y;
+      const rDist = Math.hypot(rx, ry) || 0.001;
 
-      if (cDist < wave.radius) {
-        const clickForce = (1 - cDist / wave.radius) * wave.power;
-        const clickAngle = Math.atan2(cdy, cdx);
-
-        p.vx += Math.cos(clickAngle) * clickForce;
-        p.vy += Math.sin(clickAngle) * clickForce;
+      if (rDist < ripple.radius) {
+        const ripplePower = (1 - rDist / ripple.radius) * ripple.power;
+        const angle = Math.atan2(ry, rx);
+        p.vx += Math.cos(angle) * ripplePower;
+        p.vy += Math.sin(angle) * ripplePower;
       }
     }
 
@@ -175,188 +195,134 @@ function updateTextParticles() {
   }
 }
 
-function drawTextParticles() {
-  ctx.save();
-
+function drawParticles() {
   for (const p of textParticles) {
-    ctx.shadowBlur = 14;
-    ctx.shadowColor = `rgba(112, 225, 255, ${0.5 * p.alpha})`;
-    ctx.fillStyle = `rgba(241, 246, 255, ${p.alpha})`;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = `rgba(117, 222, 255, ${0.28 * p.alpha})`;
+
+    ctx.fillStyle = `rgba(236, 243, 255, ${p.alpha})`;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.shadowBlur = 0;
-    ctx.fillStyle = `rgba(139, 92, 246, ${0.14 * p.alpha})`;
+    ctx.fillStyle = `rgba(154, 124, 255, ${0.1 * p.alpha})`;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size * 2.4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.restore();
-}
-
-function updateAmbientParticles() {
-  for (const p of ambientParticles) {
-    p.x += p.vx;
-    p.y += p.vy;
-
-    if (p.x < -20) p.x = width + 20;
-    if (p.x > width + 20) p.x = -20;
-    if (p.y < -20) p.y = height + 20;
-    if (p.y > height + 20) p.y = -20;
-  }
-}
-
-function drawAmbientParticles() {
-  for (const p of ambientParticles) {
-    ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2);
     ctx.fill();
   }
 }
 
-function drawConnections() {
-  for (let i = 0; i < ambientParticles.length; i++) {
-    const a = ambientParticles[i];
+function updateRipples() {
+  const growth = isMobile() ? SETTINGS.rippleGrowthMobile : SETTINGS.rippleGrowthDesktop;
+  clickRipples = clickRipples.filter((r) => r.life > 0.01);
 
-    for (let j = i + 1; j < ambientParticles.length; j++) {
-      const b = ambientParticles[j];
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      const dist = Math.hypot(dx, dy);
-
-      if (dist < SETTINGS.connectionDistance) {
-        const alpha = (1 - dist / SETTINGS.connectionDistance) * 0.04;
-        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-      }
-    }
+  for (const ripple of clickRipples) {
+    ripple.radius += growth;
+    ripple.power *= 0.89;
+    ripple.life *= 0.84;
   }
 }
 
-function drawMouseGlow() {
-  const radius = width < 768 ? mouse.radius * 0.9 : mouse.radius * 1.05;
-  const gradient = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, radius);
-  gradient.addColorStop(0, "rgba(112, 225, 255, 0.18)");
-  gradient.addColorStop(0.45, "rgba(139, 92, 246, 0.08)");
-  gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+function drawRipples() {
+  for (const ripple of clickRipples) {
+    ctx.strokeStyle = `rgba(117, 222, 255, ${ripple.life * 0.42})`;
+    ctx.lineWidth = isMobile() ? 1.5 : 1.8;
+    ctx.beginPath();
+    ctx.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
+    ctx.stroke();
 
-  ctx.fillStyle = gradient;
+    ctx.strokeStyle = `rgba(154, 124, 255, ${ripple.life * 0.22})`;
+    ctx.lineWidth = isMobile() ? 3.5 : 4.2;
+    ctx.beginPath();
+    ctx.arc(ripple.x, ripple.y, ripple.radius * 0.64, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function drawMouseAura() {
+  const auraRadius = isMobile() ? mouse.radius * 0.9 : mouse.radius;
+  const aura = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, auraRadius);
+  aura.addColorStop(0, "rgba(117, 222, 255, 0.12)");
+  aura.addColorStop(0.5, "rgba(154, 124, 255, 0.06)");
+  aura.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+  ctx.fillStyle = aura;
   ctx.beginPath();
-  ctx.arc(mouse.x, mouse.y, radius, 0, Math.PI * 2);
+  ctx.arc(mouse.x, mouse.y, auraRadius, 0, Math.PI * 2);
   ctx.fill();
-}
-
-function updateClickWaves() {
-  clickWaves = clickWaves.filter((wave) => wave.life > 0);
-
-  for (const wave of clickWaves) {
-    wave.radius += width < 768 ? 28 : 38;
-    wave.life -= 1;
-    wave.power *= width < 768 ? 0.86 : 0.84;
-  }
-}
-
-function drawClickWaves() {
-  for (const wave of clickWaves) {
-    const alpha = wave.life / wave.maxLife;
-
-    ctx.strokeStyle = `rgba(112, 225, 255, ${alpha * 0.55})`;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = `rgba(139, 92, 246, ${alpha * 0.28})`;
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.arc(wave.x, wave.y, wave.radius * 0.58, 0, Math.PI * 2);
-    ctx.stroke();
-  }
 }
 
 function animate() {
   ctx.clearRect(0, 0, width, height);
 
-  updateAmbientParticles();
-  drawConnections();
-  drawAmbientParticles();
+  drawMouseAura();
+  updateRipples();
+  drawRipples();
+  updateParticles();
+  drawParticles();
 
-  drawMouseGlow();
-
-  updateClickWaves();
-  drawClickWaves();
-
-  updateTextParticles();
-  drawTextParticles();
-
-  mouse.vx *= 0.78;
-  mouse.vy *= 0.78;
+  mouse.vx *= 0.76;
+  mouse.vy *= 0.76;
 
   requestAnimationFrame(animate);
 }
 
-function updateMousePosition(x, y) {
+function updatePointerPosition(x, y) {
   mouse.vx = x - mouse.lastX;
   mouse.vy = y - mouse.lastY;
   mouse.lastX = x;
   mouse.lastY = y;
   mouse.x = x;
   mouse.y = y;
-  mouse.moved = true;
 }
 
-function triggerClickEffect(x, y) {
-  clickWaves.push({
+function triggerRipple(x, y) {
+  clickRipples.push({
     x,
     y,
-    radius: 22,
-    power: SETTINGS.clickForce,
-    life: 8,
-    maxLife: 8
+    radius: isMobile() ? 14 : 18,
+    power: isMobile() ? SETTINGS.clickForceMobile : SETTINGS.clickForceDesktop,
+    life: 1
   });
 
-  if (clickWaves.length > 4) {
-    clickWaves.shift();
+  if (clickRipples.length > 4) {
+    clickRipples.shift();
   }
 }
 
-window.addEventListener("mousemove", (e) => {
-  updateMousePosition(e.clientX, e.clientY);
+window.addEventListener("mousemove", (event) => {
+  updatePointerPosition(event.clientX, event.clientY);
 });
 
-window.addEventListener("mousedown", (e) => {
-  triggerClickEffect(e.clientX, e.clientY);
+window.addEventListener("mousedown", (event) => {
+  triggerRipple(event.clientX, event.clientY);
 });
-
-window.addEventListener(
-  "touchmove",
-  (e) => {
-    const touch = e.touches[0];
-    if (!touch) return;
-    updateMousePosition(touch.clientX, touch.clientY);
-  },
-  { passive: true }
-);
 
 window.addEventListener(
   "touchstart",
-  (e) => {
-    const touch = e.touches[0];
+  (event) => {
+    const touch = event.touches[0];
     if (!touch) return;
-    updateMousePosition(touch.clientX, touch.clientY);
-    triggerClickEffect(touch.clientX, touch.clientY);
+    updatePointerPosition(touch.clientX, touch.clientY);
+    triggerRipple(touch.clientX, touch.clientY);
   },
   { passive: true }
 );
 
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener(
+  "touchmove",
+  (event) => {
+    const touch = event.touches[0];
+    if (!touch) return;
+    updatePointerPosition(touch.clientX, touch.clientY);
+  },
+  { passive: true }
+);
+
+window.addEventListener("resize", () => {
+  resizeCanvas();
+});
 
 resizeCanvas();
 animate();
